@@ -1,0 +1,19 @@
+{
+  "authors" : [
+    "Martin Barth"
+  ],
+  "build-depends" : [ ],
+  "depends" : [ ],
+  "description" : "blah blah blah",
+  "license" : "Artistic-2.0",
+  "name" : "I18N::LangTags",
+  "perl" : "6.c",
+  "provides" : {
+    "I18N::LangTags" : "lib/I18N/LangTags.pm6"
+  },
+  "resources" : [ ],
+  "source-url" : "",
+  "tags" : [ ],
+  "test-depends" : [ ],
+  "version" : "0.0.1"
+}
