@@ -5,32 +5,66 @@ unit module I18N::LangTags::List;
 use Data::Dump;
 
 our grammar LangTagGrammar {
-    token TOP {
-        '[' <language> ']' # language not encouraged for normal use
-        |
-        <language>
-    }
-    token language { '{' <langtag> '} : ' <name> }
+    token TOP { <disrec_language> | <language> }
+    token disrec_language { '[' <language> ']' }
+    token language { '{' <langtag> '}' \h+ [ ':' \h+]? <name> }
     token langtag { [ <alpha> | '-' ]+ }
-    token name { <[\w\s]>+ }
+    token name { <[\w\s\-()]>+ }
 
     regex scan_languages { [ .*? <TOP> .*?]+  }
+    regex formerly { .*? 'Formerly "' <langtag> '"' .*? }
 }
 
 class LangTagActions {
-    method TOP($/) { make $/<language>.made }
-    method language($/) { make ($/<langtag>.made => $/<name>.made) }
+    method TOP($/) {
+        my %what = $/<disrec_language>:exists
+            ?? $/<disrec_language>.made
+            !! $/<language>.made;
+        make %what;
+
+    }
+    method disrec_language($/) {
+        make %(
+            tag       => $<language><langtag>.made,
+            name      => $<language><name>.made,
+            is_disrec => True,
+        );
+    }
+    method language($/) {
+        make %(
+            tag       => $<langtag>.made,
+            name      => $<name>.made,
+            is_disrec => False,
+        );
+    }
     method langtag($/) { make $/.Str }
     method name($/) { make $/.Str }
 
     method scan_languages($/) {
-        make $/<TOP>.map( *.made).Hash;
+        make $/<TOP>.map( *.made);
+    }
+
+    method formerly($/) {
+        make $/<langtag>.made;
     }
 }
 
+my $Debug = 0;
+# Parsing
 my $stop-skip = 0;
+my $actions = LangTagActions.new;
 
-my @found;
+# Storing
+my Str $last-lang-name;
+our %Name;
+our %Is_Disrec;
+
+my sub save-language(Str:D $tag, Str:D $name = $last-lang-name, Bool $is_disrec = True) {
+    $last-lang-name = $name;
+    %Name{      $tag } = $name;
+    %Is_Disrec{ $tag } = $name if $is_disrec;
+}
+
 for $=pod[0].contents() -> $node {
     if $node ~~ Pod::Heading
         and $node.contents.[0] ~~ Pod::Block::Para
@@ -41,27 +75,88 @@ for $=pod[0].contents() -> $node {
     if $stop-skip {
         if $node ~~ Pod::Item {
             for $node.contents -> $subnode {
-                if $subnode ~~ Pod::Block::Para {
+                if $subnode ~~ (Pod::Block::Para|Pod::Block::Comment) {
                     for $subnode.contents -> $content {
                         if $content ~~ Str {
-                            push @found, $content;
-                        } else {
-                            say "1 WRONG: " ~ Dump( $content, :skip-methods );
+                            my $Debug = 0;
+                            $Debug = $content.contains('{gem');
+                            say $content if $Debug;
+
+                            for LangTagGrammar.parse(
+                                $content,
+                                :rule('scan_languages'),
+                                :$actions).made -> $language {
+                                say $language if $Debug;
+                                with $language {
+                                    save-language($language<tag>, $language<name>, $language<is_disrec>);
+                                }
+                            }
+                            if LangTagGrammar.parse(
+                                $content,
+                                :rule('formerly'),
+                                :$actions).made() -> $langtag {
+                                save-language($langtag);
+                            };
                         }
                     }
-                } elsif $subnode ~~ Pod::Block::Comment {
-                } else {
-                    say "2 WRONG: " ~ Dump( $subnode, :skip-methods );
                 }
             }
-        } else {
-            say "3 WRONG: " ~ Dump( $node, :skip-methods );
         }
     }
 }
 
-say "FOUND:";
-#.say for @found;
+our sub name(Str:D $tag is copy --> Str:D) {
+    $tag .= trim();
+
+    return Nil unless LangTagGrammar.parse($tag, :rule('langtag'));
+    say "Input: {$tag}" if $Debug;
+
+    my $alt;
+    $alt = 'x-' ~ $/[0] if $tag ~~ / 'i-' (.*) /;
+    $alt = 'i-' ~ $/[0] if $tag ~~ / 'x-' (.*) /;
+
+    my $subform = '';
+    my $name = '';
+    my regex shave { '-' <alpha> $ };
+
+    while $tag.chars {
+        last if $name = %Name{$tag};
+        last if $name = %Name{$alt};
+
+        if $tag ~~ s/ ( <shave> ) // {
+            say "Shaving off: $/[0] leaving $tag" if $Debug;
+            $subform = $/[0] ~ $subform;
+
+            $alt ~~ s/ ( <shave> )//;
+            say " alt -> $alt" if $Debug;
+        } else {
+            # we're trying to pull a subform off a primary tag. TILT!
+            say "Aborting on: {$name}{$subform}" if $Debug;
+            last;
+        }
+    }
+    return Nil unless $name;
+    return $name unless $subform;
+
+    $subform ~~ s/ ^ '-'   //;
+    $subform ~~ s/   '-' $ //;
+    return "$name (Subform \"$subform\")";
+}
+
+our sub is_decent(Str:D $tag --> Bool) {
+    return False unless LangTagGrammar.parse($tag, :rule('langtag'));
+    my @supers = ();
+    for $tag.split('-') -> $bit {
+        @supers.push( @supers.elems > 0 ?? @supers[*-1] ~ '-' ~ $bit !! $bit);
+    };
+    @supers.shift() if @supers[0].fc eq fc('i' | 'x' | 'sgn');
+    return False unless @supers;
+    for ($tag, |@supers) -> $f {
+        return False if %Is_Disrec{ $f }:exists;
+        return True if %Name{ $f }:exists;
+    }
+    return True;
+}
 
 =begin pod
 
