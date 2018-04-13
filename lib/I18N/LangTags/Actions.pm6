@@ -27,6 +27,10 @@ class I18N::LangTags::Actions {
         make $/<TOP>.map( *.made);
     }
 
+    method scan_langtags($/) {
+        make $/<langtag>.map( *.made);
+    }
+
     method formerly($/) {
         make $/<langtag>.made;
     }

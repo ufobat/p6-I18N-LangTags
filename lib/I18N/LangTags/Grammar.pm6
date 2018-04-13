@@ -11,5 +11,6 @@ grammar I18N::LangTags::Grammar {
     token name { <[\w\s\-()]>+ }
 
     regex scan_languages { [ .*? <TOP> .*?]+  }
+    regex scan_langtags  { [ .*? <|w> <langtag> <|w> .*? ]+ }
     regex formerly { .*? 'Formerly "' <langtag> '"' .*? }
 }

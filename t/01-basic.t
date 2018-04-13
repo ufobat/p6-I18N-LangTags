@@ -2,6 +2,7 @@ use v6.c;
 use Test;
 use I18N::LangTags;
 
-pass "replace me";
+is extract_language_tags("de-at, en or something"),
+('de-at', 'en', 'or');
 
 done-testing;

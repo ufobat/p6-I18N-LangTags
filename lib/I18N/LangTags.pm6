@@ -4,9 +4,18 @@ use I18N::LangTags::Grammar;
 use I18N::LangTags::Actions;
 use I18N::LangTags::Grammar;
 
+my $actions = I18N::LangTags::Actions.new();
+
 sub is_language_tag(Str:D $tag --> Bool) is export {
     return False if $tag.fc eq fc( 'i' | 'x');
     return so I18N::LangTags::Grammar.parse($tag, :rule('langtag'))
+}
+
+sub extract_language_tags(Str:D $text) is export {
+    return I18N::LangTags::Grammar.parse(
+        $text,
+        :rule('scan_langtags'),
+        :$actions).made
 }
 
 =begin pod
