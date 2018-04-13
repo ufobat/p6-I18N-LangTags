@@ -27,7 +27,6 @@ is I18N::LangTags::Grammar.parse(
     :rule('scan_languages')),
 'noise [{en} : This is English] noise {de} : German';
 
-
 # With actions
 # a Pair
 is-deeply I18N::LangTags::Grammar.parse(
@@ -85,5 +84,20 @@ is-deeply I18N::LangTags::Grammar.parse(
 (
     {:is_disrec(True), :name("French-based Creoles and pidgins (Other)"), :tag("cpf")},
 );
+
+is I18N::LangTags::Grammar.parse(
+    'i-tao',
+    :rule('langtag')),
+'i-tao';
+
+is I18N::LangTags::Grammar.parse(
+    'it',
+    :rule('langtag')),
+'it';
+
+is I18N::LangTags::Grammar.parse(
+    '{it} : Italian',
+    :rule('language')),
+'{it} : Italian';
 
 done-testing;

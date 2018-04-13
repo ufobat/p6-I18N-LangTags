@@ -1,8 +1,13 @@
+use v6.c;
+
 grammar I18N::LangTags::Grammar {
     token TOP { <disrec_language> | <language> }
     token disrec_language { '[' <language> ']' }
     token language { '{' <langtag> '}' \h+ [ ':' \h+]? <name> }
-    token langtag { [ <alpha> | '-' ]+ }
+    regex langtag {
+        [ 'i' | 'x' | [<alpha> ** 2..3] ] # start
+        [ '-' <alpha> ** 1..8] *            # subtags
+    }
     token name { <[\w\s\-()]>+ }
 
     regex scan_languages { [ .*? <TOP> .*?]+  }

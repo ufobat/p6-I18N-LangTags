@@ -34,10 +34,13 @@ for $=pod[0].contents() -> $node {
                     for $subnode.contents -> $content {
                         if $content ~~ Str {
 
+                            say $content if $Debug;
+
                             for I18N::LangTags::Grammar.parse(
                                 $content,
                                 :rule('scan_languages'),
                                 :$actions).made -> $language {
+                                say $language if $Debug;
                                 with $language {
                                     save-language($language<tag>, $language<name>, $language<is_disrec>);
                                 }
