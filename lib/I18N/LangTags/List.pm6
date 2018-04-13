@@ -1,58 +1,13 @@
 use v6.c;
 
 unit module I18N::LangTags::List;
-
-use Data::Dump;
-
-our grammar LangTagGrammar {
-    token TOP { <disrec_language> | <language> }
-    token disrec_language { '[' <language> ']' }
-    token language { '{' <langtag> '}' \h+ [ ':' \h+]? <name> }
-    token langtag { [ <alpha> | '-' ]+ }
-    token name { <[\w\s\-()]>+ }
-
-    regex scan_languages { [ .*? <TOP> .*?]+  }
-    regex formerly { .*? 'Formerly "' <langtag> '"' .*? }
-}
-
-class LangTagActions {
-    method TOP($/) {
-        my %what = $/<disrec_language>:exists
-            ?? $/<disrec_language>.made
-            !! $/<language>.made;
-        make %what;
-
-    }
-    method disrec_language($/) {
-        make %(
-            tag       => $<language><langtag>.made,
-            name      => $<language><name>.made,
-            is_disrec => True,
-        );
-    }
-    method language($/) {
-        make %(
-            tag       => $<langtag>.made,
-            name      => $<name>.made,
-            is_disrec => False,
-        );
-    }
-    method langtag($/) { make $/.Str }
-    method name($/) { make $/.Str }
-
-    method scan_languages($/) {
-        make $/<TOP>.map( *.made);
-    }
-
-    method formerly($/) {
-        make $/<langtag>.made;
-    }
-}
+use I18N::LangTags::Grammar;
+use I18N::LangTags::Actions;
 
 my $Debug = 0;
 # Parsing
 my $stop-skip = 0;
-my $actions = LangTagActions.new;
+my $actions = I18N::LangTags::Actions.new;
 
 # Storing
 my Str $last-lang-name;
@@ -78,20 +33,16 @@ for $=pod[0].contents() -> $node {
                 if $subnode ~~ (Pod::Block::Para|Pod::Block::Comment) {
                     for $subnode.contents -> $content {
                         if $content ~~ Str {
-                            my $Debug = 0;
-                            $Debug = $content.contains('{gem');
-                            say $content if $Debug;
 
-                            for LangTagGrammar.parse(
+                            for I18N::LangTags::Grammar.parse(
                                 $content,
                                 :rule('scan_languages'),
                                 :$actions).made -> $language {
-                                say $language if $Debug;
                                 with $language {
                                     save-language($language<tag>, $language<name>, $language<is_disrec>);
                                 }
                             }
-                            if LangTagGrammar.parse(
+                            if I18N::LangTags::Grammar.parse(
                                 $content,
                                 :rule('formerly'),
                                 :$actions).made() -> $langtag {
@@ -108,7 +59,7 @@ for $=pod[0].contents() -> $node {
 our sub name(Str:D $tag is copy --> Str:D) {
     $tag .= trim();
 
-    return Nil unless LangTagGrammar.parse($tag, :rule('langtag'));
+    return Nil unless I18N::LangTags::Grammar.parse($tag, :rule('langtag'));
     say "Input: {$tag}" if $Debug;
 
     my $alt;
@@ -144,7 +95,7 @@ our sub name(Str:D $tag is copy --> Str:D) {
 }
 
 our sub is_decent(Str:D $tag --> Bool) {
-    return False unless LangTagGrammar.parse($tag, :rule('langtag'));
+    return False unless I18N::LangTags::Grammar.parse($tag, :rule('langtag'));
     my @supers = ();
     for $tag.split('-') -> $bit {
         @supers.push( @supers.elems > 0 ?? @supers[*-1] ~ '-' ~ $bit !! $bit);
