@@ -100,4 +100,9 @@ is I18N::LangTags::Grammar.parse(
     :rule('language')),
 '{it} : Italian';
 
+is I18N::LangTags::Grammar.parse(
+    'i',
+    :rule('langtag')),
+Nil;
+
 done-testing;
