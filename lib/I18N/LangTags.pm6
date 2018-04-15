@@ -7,15 +7,66 @@ use I18N::LangTags::Grammar;
 my $actions = I18N::LangTags::Actions.new();
 
 sub is_language_tag(Str:D $tag --> Bool) is export {
-    return False if $tag.fc eq fc( 'i' | 'x');
     return so I18N::LangTags::Grammar.parse($tag, :rule('langtag'))
 }
 
-sub extract_language_tags(Str:D $text) is export {
+sub extract_language_tags(Str:D $text --> Seq) is export {
     return I18N::LangTags::Grammar.parse(
         $text,
         :rule('scan_langtags'),
         :$actions).made
+}
+
+sub same_language_tag(Str:D $tag1, Str:D $tag2 --> Bool) is export {
+    return encode_language_tag($tag1) eq encode_language_tag($tag2)
+        if is_language_tag($tag1) and is_language_tag($tag2);
+    return False;
+}
+
+sub encode_language_tag(Str:D $tag is copy --> Str:D) is export {
+    # Only similarity_language_tag() is allowed to analyse encodings!
+    ## Changes in the language tagging standards may have to be reflected here.
+    return Nil unless is_language_tag($tag);
+
+    # For the moment, these legacy variances are few enough that
+    #  we can just handle them here with regexps.
+    my regex ix { ['i' | 'x' ] }
+
+    $tag ~~ s:i/ ^ 'iw'           <|w> /he/; # Hebrew
+    $tag ~~ s:i/ ^ 'in'           <|w> /id/; # Indonesian
+    $tag ~~ s:i/ ^ 'cre'          <|w> /cr/; # Cree
+    $tag ~~ s:i/ ^ 'jw'           <|w> /jv/; # Javanese
+    $tag ~~ s:i/ ^ <ix> '-lux'    <|w> /lb/; # Luxemburger
+    $tag ~~ s:i/ ^ <ix> '-navajo' <|w> /nv/; # Navajo
+    $tag ~~ s:i/ ^ 'ji'           <|w> /yi/; # Yiddish
+
+    # SMB 2003 -- Hm.  There's a bunch of new XXX->YY variances now,
+    #  but maybe they're all so obscure I can ignore them.   "Obscure"
+    #  meaning either that the language is obscure, and/or that the
+    #  XXX form was extant so briefly that it's unlikely it was ever
+    #  used.  I hope.
+    #
+    # These go FROM the simplex to complex form, to get
+    #  similarity-comparison right.  And that's okay, since
+    #  similarity_language_tag is the only thing that
+    #  analyzes our output.
+    $tag ~~ s:i/ ^ <ix> '-hakka' <|w> /zh-hakka/;  # Hakka
+    $tag ~~ s:i/ ^ 'nb'          <|w> /no-bok/;    # BACKWARDS for Bokmal
+    $tag ~~ s:i/ ^ 'nn'          <|w> /no-nyn/;    # BACKWARDS for Nynorsk
+
+    # Just lop off any leading "x/i-"
+    $tag ~~ s:i/ ^ <ix> '-' //;
+    return "~" ~ uc($tag);
+}
+
+sub similarity_language_tag(Str:D $tag1, Str:D $tag2 --> Int) is export {
+    return Nil unless is_language_tag($tag1) and is_language_tag($tag2);
+    return 0 unless is_language_tag($tag1) or is_language_tag($tag2);
+
+    my @subtags1 = encode_language_tag($tag1).split('-');
+    my @subtags2 = encode_language_tag($tag2).split('-');
+
+    return (@subtags1 Z== @subtags2).grep(*.so).elems;
 }
 
 =begin pod

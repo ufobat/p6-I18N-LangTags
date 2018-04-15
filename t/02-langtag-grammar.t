@@ -105,4 +105,8 @@ is I18N::LangTags::Grammar.parse(
     :rule('langtag')),
 Nil;
 
+is I18N::LangTags::Grammar.parse(
+    'x-borg-prot5123',
+    :rule('langtag')),
+'x-borg-prot5123';
 done-testing;
