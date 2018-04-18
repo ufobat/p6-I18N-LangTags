@@ -2,9 +2,9 @@ use v6.c;
 unit class I18N::LangTags:ver<0.0.1>;
 use I18N::LangTags::Grammar;
 use I18N::LangTags::Actions;
-use I18N::LangTags::Grammar;
 
 my $actions = I18N::LangTags::Actions.new();
+my regex ix { ['i' | 'x' ] }
 
 sub is_language_tag(Str:D $tag --> Bool) is export {
     return so I18N::LangTags::Grammar.parse($tag, :rule('langtag'))
@@ -23,6 +23,64 @@ sub same_language_tag(Str:D $tag1, Str:D $tag2 --> Bool) is export {
     return False;
 }
 
+sub similarity_language_tag(Str:D $tag1, Str:D $tag2 --> Int) is export {
+    return Nil unless is_language_tag($tag1) and is_language_tag($tag2);
+    return 0 unless is_language_tag($tag1) or is_language_tag($tag2);
+
+    my @subtags1 = encode_language_tag($tag1).split('-');
+    my @subtags2 = encode_language_tag($tag2).split('-');
+
+    my Int $similarity = 0;
+    for (@subtags1 Z[eq] @subtags2) -> $similar {
+        if $similar {
+            $similarity++;
+        } else {
+            return $similarity;
+        }
+    }
+    return $similarity;
+}
+
+sub is_dialact_of(Str:D $tag1, Str:D $tag2 --> Bool) is export {
+    my $lang1 = encode_language_tag($tag1);
+    my $lang2 = encode_language_tag($tag2);
+
+    return Bool if !is_language_tag($lang1) && !is_language_tag($lang2);
+    return False if !is_language_tag($lang1) or !is_language_tag($lang2);
+
+    return True if $lang1 eq $lang2;
+    return False if $lang1.chars < $lang2.chars;
+
+    $lang1 ~= '-';
+    $lang2 ~= '-';
+    return $lang1.substr(0, $lang2.chars) eq $lang2;
+}
+
+sub super_languages(Str:D $tag --> List) is export {
+    return () unless is_language_tag($tag);
+    # a hack for those annoying new (2001) tags:
+    $tag ~~ s:i/ ^ 'nb' <|w> / 'no-bok' /; # yes, backwards
+    $tag ~~ s:i/ ^ 'nn' <|w> / 'no-nyn' /; # yes, backwards
+    $tag ~~ s:i/ ^ <ix> ( '-hakka' <|w> ) / 'zh' $1 /; # goes the right way
+    # i-hakka-bork-bjork-bjark => zh-hakka-bork-bjork-bjark
+
+    my @supers;
+    for $tag.split('-') -> $bit {
+        @supers.push( @supers.elems > 0 ?? @supers[*-1] ~ '-' ~ $bit !! $bit);
+    };
+    pop @supers if @supers;
+    shift @supers if @supers[0] ~~ m:i/ ^ <ix> $ /;
+    return @supers.reverse();
+}
+
+sub locale2language_tag(Str:D $locale is copy --> Str) is export {
+    return $locale if is_language_tag($locale);
+    $locale ~~ s:g/ '_' /-/;
+    $locale ~~ s/ [ ['.'|'@'] [ <alnum> | '-' ]+]+ $ //;
+    return $locale if is_language_tag($locale);
+    return Str;
+}
+
 sub encode_language_tag(Str:D $tag is copy --> Str:D) is export {
     # Only similarity_language_tag() is allowed to analyse encodings!
     ## Changes in the language tagging standards may have to be reflected here.
@@ -30,7 +88,6 @@ sub encode_language_tag(Str:D $tag is copy --> Str:D) is export {
 
     # For the moment, these legacy variances are few enough that
     #  we can just handle them here with regexps.
-    my regex ix { ['i' | 'x' ] }
 
     $tag ~~ s:i/ ^ 'iw'           <|w> /he/; # Hebrew
     $tag ~~ s:i/ ^ 'in'           <|w> /id/; # Indonesian
@@ -59,14 +116,122 @@ sub encode_language_tag(Str:D $tag is copy --> Str:D) is export {
     return "~" ~ uc($tag);
 }
 
-sub similarity_language_tag(Str:D $tag1, Str:D $tag2 --> Int) is export {
-    return Nil unless is_language_tag($tag1) and is_language_tag($tag2);
-    return 0 unless is_language_tag($tag1) or is_language_tag($tag2);
+sub alternate_language_tags(Str:D $tag) is export {
+    return () unless is_language_tag($tag);
+    my @em;
 
-    my @subtags1 = encode_language_tag($tag1).split('-');
-    my @subtags2 = encode_language_tag($tag2).split('-');
+    if    $tag ~~ m:i/ ^ <ix> '-hakka' <|w> (.*)/ { push @em, "zh-hakka$0"; }
+    elsif $tag ~~ m:i/ ^ 'zh-hakka' <|w> (.*)/ {    push @em, "x-hakka$0", "i-hakka$0"; }
+    elsif $tag ~~ m:i/ ^ 'he' <|w> (.*)/ {          push @em, "iw$0"; }
+    elsif $tag ~~ m:i/ ^ 'iw' <|w>(.*)/ {           push @em, "he$0"; }
+    elsif $tag ~~ m:i/ ^ 'in' <|w>(.*)/ {           push @em, "id$0"; }
+    elsif $tag ~~ m:i/ ^ 'id' <|w>(.*)/ {           push @em, "in$0"; }
+    elsif $tag ~~ m:i/ ^ <ix> '-lux' <|w>(.*)/ {    push @em, "lb$0"; }
+    elsif $tag ~~ m:i/ ^ 'lb' <|w>(.*)/ {           push @em, "i-lux$0", "x-lux$0"; }
+    elsif $tag ~~ m:i/ ^ <ix> '-navajo' <|w>(.*)/ { push @em, "nv$0"; }
+    elsif $tag ~~ m:i/ ^ 'nv' <|w>(.*)/ {           push @em, "i-navajo$0", "x-navajo$0"; }
+    elsif $tag ~~ m:i/ ^ 'yi' <|w>(.*)/ {           push @em, "ji$0"; }
+    elsif $tag ~~ m:i/ ^ 'ji' <|w>(.*)/ {           push @em, "yi$0"; }
+    elsif $tag ~~ m:i/ ^ 'nb' <|w>(.*)/ {           push @em, "no-bok$0"; }
+    elsif $tag ~~ m:i/ ^ 'no-bok' <|w>(.*)/ {       push @em, "nb$0"; }
+    elsif $tag ~~ m:i/ ^ 'nn' <|w>(.*)/ {           push @em, "no-nyn$0"; }
+    elsif $tag ~~ m:i/ ^ 'no-nyn' <|w>(.*)/ {       push @em, "nn$0"; }
 
-    return (@subtags1 Z== @subtags2).grep(*.so).elems;
+    state %alt = (
+        i => 'x',
+        x => 'i',
+    );
+    push @em, %alt{ $1.lc()} ~ $2 if $tag ~~ m:i/^ (<ix>) ('-' .+)/;
+    return @em;
+}
+
+my sub init_panic(--> Hash) is pure {
+    my %panic;
+    for (
+        # MUST all be lowercase!
+        # Only large ("national") languages make it in this list.
+        #  If you, as a user, are so bizarre that the /only/ language
+        #  you claim to accept is Galician, then no, we won't do you
+        #  the favor of providing Catalan as a panic-fallback for
+        #  you.  Because if I start trying to add "little languages" in
+        #  here, I'll just go crazy.
+
+        # Scandinavian lgs.  All based on opinion and hearsay.
+        'sv'       => <nb no da nn>,
+        'da'       => <nb no sv nn>, # I guess
+        <no nn nb> => <no nn nb sv da>,
+        'is'       => <da sv no nb nn>,
+        'fo'       => <da is no nb nn sv>, # I guess
+
+        # I think this is about the extent of tolerable intelligibility
+        #  among large modern Romance languages.
+        'pt' => <es ca it fr>, # Portuguese, Spanish, Catalan, Italian, French
+        'ca' => <es pt it fr>,
+        'es' => <ca it fr pt>,
+        'it' => <es fr ca pt>,
+        'fr' => <es it ca pt>,
+
+        # Also assume that speakers of the main Indian languages prefer
+        #  to read/hear Hindi over English
+        <as bn gu kn ks kok ml mni mr ne or pa sa sd te ta ur> => 'hi',
+
+        # Assamese, Bengali, Gujarati, [Hindi,] Kannada (Kanarese), Kashmiri,
+        # Konkani, Malayalam, Meithei (Manipuri), Marathi, Nepali, Oriya,
+        # Punjabi, Sanskrit, Sindhi, Telugu, Tamil, and Urdu.
+        'hi' => <bn pa as or>,
+
+        # I welcome finer data for the other Indian languages.
+        #  E.g., what should Oriya's list be, besides just Hindi?
+        # And the panic languages for English is, of course, nil!
+
+        # My guesses at Slavic intelligibility:
+        Pair.new( |( <ru be uk> xx 2)),   # Russian, Belarusian, Ukranian
+        Pair.new( |( <sr hr bs> xx 2)),  # Serbian, Croatian, Bosnian
+        'cs' => 'sk', 'sk' => 'cs', # Czech + Slovak
+        'ms' => 'id', 'id' => 'ms', # Malay + Indonesian
+        'et' => 'fi', 'fi' => 'et', # Estonian + Finnish
+        #?? 'lo' => 'th', 'th' => 'lo', # Lao + Thai
+    ) {
+        my ($keys, $vals) = .kv;
+        for |$keys -> $k {
+            for |$vals -> $v {
+                %panic{ $k }.push: $v;
+            }
+        }
+    }
+    return %panic;
+}
+
+sub panic_languages(*@tags --> Set) is export {
+    # When in panic or in doubt, run in circles, scream, and shout!
+    state %panic = init_panic();
+    my @out = <en>;
+    for @tags -> $tag {
+        @out.push: |$_ with %panic{$tag};
+    }
+    return set @out;
+}
+
+sub implicate_supers(*@tags --> Set) is export {
+    my @languages = @tags.grep({ is_language_tag($_) });
+    my @out;
+
+    for @languages -> $lang {
+        @out.push: $lang;
+        @out.append: super_languages($lang);
+    }
+
+    return set @out;
+}
+
+sub implicate_supers_strictly(*@tags --> Set) is export {
+    my @languages = @tags.grep({ is_language_tag($_) });
+    my @out = @languages;
+
+    for @languages -> $lang {
+        @out.append: super_languages($lang);
+    }
+    return set @out;
 }
 
 =begin pod

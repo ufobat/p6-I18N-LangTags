@@ -65,14 +65,13 @@ our sub name(Str:D $tag is copy --> Str:D) {
     return Nil unless I18N::LangTags::Grammar.parse($tag, :rule('langtag'));
     say "Input: {$tag}" if $Debug;
 
-    my $alt;
+    my $subform = '';
+    my $name = '';
+    my $alt = '';
     $alt = 'x-' ~ $/[0] if $tag ~~ / 'i-' (.*) /;
     $alt = 'i-' ~ $/[0] if $tag ~~ / 'x-' (.*) /;
 
-    my $subform = '';
-    my $name = '';
-    my regex shave { '-' <alpha> $ };
-
+    my regex shave { '-' <alnum>+ $ };
     while $tag.chars {
         last if $name = %Name{$tag};
         last if $name = %Name{$alt};
