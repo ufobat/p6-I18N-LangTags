@@ -16,7 +16,7 @@
   },
   "resources" : [ ],
   "source-url" : "https://github.com/ufobat/p6-I18N-LangTags.git",
-  "tags" : [ ],
+  "tags" : [ "CPAN5" ],
   "test-depends" : [ ],
   "version" : "0.0.1"
 }
