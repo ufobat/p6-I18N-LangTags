@@ -24,7 +24,7 @@ sub same_language_tag(Str:D $tag1, Str:D $tag2 --> Bool) is export {
 }
 
 sub similarity_language_tag(Str:D $tag1, Str:D $tag2 --> Int) is export {
-    return Nil unless is_language_tag($tag1) and is_language_tag($tag2);
+    return Int unless is_language_tag($tag1) and is_language_tag($tag2);
     return 0 unless is_language_tag($tag1) or is_language_tag($tag2);
 
     my @subtags1 = encode_language_tag($tag1).split('-');
@@ -56,7 +56,7 @@ sub is_dialact_of(Str:D $tag1, Str:D $tag2 --> Bool) is export {
     return $lang1.substr(0, $lang2.chars) eq $lang2;
 }
 
-sub super_languages(Str:D $tag --> List) is export {
+sub super_languages(Str:D $tag --> Seq) is export {
     return () unless is_language_tag($tag);
     # a hack for those annoying new (2001) tags:
     $tag ~~ s:i/ ^ 'nb' <|w> / 'no-bok' /; # yes, backwards
@@ -69,7 +69,7 @@ sub super_languages(Str:D $tag --> List) is export {
         @supers.push( @supers.elems > 0 ?? @supers[*-1] ~ '-' ~ $bit !! $bit);
     };
     pop @supers if @supers;
-    shift @supers if @supers[0] ~~ m:i/ ^ <ix> $ /;
+    shift @supers if @supers and @supers[0] ~~ m:i/ ^ <ix> $ /;
     return @supers.reverse();
 }
 
@@ -84,7 +84,7 @@ sub locale2language_tag(Str:D $locale is copy --> Str) is export {
 sub encode_language_tag(Str:D $tag is copy --> Str:D) is export {
     # Only similarity_language_tag() is allowed to analyse encodings!
     ## Changes in the language tagging standards may have to be reflected here.
-    return Nil unless is_language_tag($tag);
+    return Str unless is_language_tag($tag);
 
     # For the moment, these legacy variances are few enough that
     #  we can just handle them here with regexps.
@@ -202,36 +202,40 @@ my sub init_panic(--> Hash) is pure {
     return %panic;
 }
 
-sub panic_languages(*@tags --> Set) is export {
+sub panic_languages(*@tags --> Seq) is export {
     # When in panic or in doubt, run in circles, scream, and shout!
     state %panic = init_panic();
     my @out = <en>;
     for @tags -> $tag {
         @out.push: |$_ with %panic{$tag};
     }
-    return set @out;
+    return @out.unique;
 }
 
-sub implicate_supers(*@tags --> Set) is export {
+sub implicate_supers(*@tags --> Seq) is export {
     my @languages = @tags.grep({ is_language_tag($_) });
+    my $seen = SetHash.new: @languages.map({ encode_language_tag($_) });
     my @out;
 
     for @languages -> $lang {
         @out.push: $lang;
-        @out.append: super_languages($lang);
+        for super_languages($lang) {
+            last if encode_language_tag($_) ∈ $seen;
+            @out.push: $_;
+        }
     }
 
-    return set @out;
+    return @out.unique;
 }
 
-sub implicate_supers_strictly(*@tags --> Set) is export {
+sub implicate_supers_strictly(*@tags --> Seq) is export {
     my @languages = @tags.grep({ is_language_tag($_) });
     my @out = @languages;
 
     for @languages -> $lang {
         @out.append: super_languages($lang);
     }
-    return set @out;
+    return @out.unique;
 }
 
 =begin pod
@@ -284,6 +288,393 @@ Returns true iff $lang1 is a formally valid language tag.
 
    is_language_tag("x-borg-prot2532") is TRUE
        (Yes, subtags can contain digits, as of RFC3066)
+=end item
+
+=begin item
+function extract_language_tags($whatever)
+
+Returns a list of whatever looks like formally valid language tags
+in $whatever.  Not very smart, so don't get too creative with
+what you want to feed it.
+
+  extract_language_tags("fr, fr-ca, i-mingo")
+    returns:   ('fr', 'fr-ca', 'i-mingo')
+
+  extract_language_tags("It's like this: I'm in fr -- French!")
+    returns:   ('It', 'in', 'fr')
+  (So don't just feed it any old thing.)
+
+The output is untainted.  If you don't know what tainting is,
+don't worry about it.
+=end item
+
+=begin item
+function same_language_tag($lang1, $lang2)
+
+Returns true iff $lang1 and $lang2 are acceptable variant tags
+representing the same language-form.
+
+   same_language_tag('x-kadara', 'i-kadara')  is TRUE
+      (The x/i- alternation doesn't matter)
+   same_language_tag('X-KADARA', 'i-kadara')  is TRUE
+      (...and neither does case)
+   same_language_tag('en',       'en-US')     is FALSE
+      (all-English is not the SAME as US English)
+   same_language_tag('x-kadara', 'x-kadar')   is FALSE
+      (these are totally unrelated tags)
+   same_language_tag('no-bok',    'nb')       is TRUE
+      (no-bok is a legacy tag for nb (Norwegian Bokmal))
+
+C<same_language_tag> works by just seeing whether
+C<encode_language_tag($lang1)> is the same as
+C<encode_language_tag($lang2)>.
+
+(Yes, I know this function is named a bit oddly.  Call it historic
+reasons.)
+=end item
+
+=begin item
+function similarity_language_tag($lang1, $lang2)
+
+Returns an integer representing the degree of similarity between
+tags $lang1 and $lang2 (the order of which does not matter), where
+similarity is the number of common elements on the left,
+without regard to case and to x/i- alternation.
+
+   similarity_language_tag('fr', 'fr-ca')           is 1
+      (one element in common)
+   similarity_language_tag('fr-ca', 'fr-FR')        is 1
+      (one element in common)
+
+   similarity_language_tag('fr-CA-joual',
+                           'fr-CA-PEI')             is 2
+   similarity_language_tag('fr-CA-joual', 'fr-CA')  is 2
+      (two elements in common)
+
+   similarity_language_tag('x-kadara', 'i-kadara')  is 1
+      (x/i- doesn't matter)
+
+   similarity_language_tag('en',       'x-kadar')   is 0
+   similarity_language_tag('x-kadara', 'x-kadar')   is 0
+      (unrelated tags -- no similarity)
+
+   similarity_language_tag('i-cree-syllabic',
+                           'i-cherokee-syllabic')   is 0
+      (no B<leftmost> elements in common!)
+=end item
+
+=begin item
+function is_dialect_of($lang1, $lang2)
+
+Returns true iff language tag $lang1 represents a subform of
+language tag $lang2.
+
+B<Get the order right!  It doesn't work the other way around!>
+
+   is_dialect_of('en-US', 'en')            is TRUE
+     (American English IS a dialect of all-English)
+
+   is_dialect_of('fr-CA-joual', 'fr-CA')   is TRUE
+   is_dialect_of('fr-CA-joual', 'fr')      is TRUE
+     (Joual is a dialect of (a dialect of) French)
+
+   is_dialect_of('en', 'en-US')            is FALSE
+     (all-English is a NOT dialect of American English)
+
+   is_dialect_of('fr', 'en-CA')            is FALSE
+
+   is_dialect_of('en',    'en'   )         is TRUE
+   is_dialect_of('en-US', 'en-US')         is TRUE
+     (B<Note:> these are degenerate cases)
+
+   is_dialect_of('i-mingo-tom', 'x-Mingo') is TRUE
+     (the x/i thing doesn't matter, nor does case)
+
+   is_dialect_of('nn', 'no')               is TRUE
+     (because 'nn' (New Norse) is aliased to 'no-nyn',
+      as a special legacy case, and 'no-nyn' is a
+      subform of 'no' (Norwegian))
+=end item
+
+=begin item
+super_languages($lang1)
+
+Returns a list of language tags that are superordinate tags to $lang1
+-- it gets this by removing subtags from the end of $lang1 until
+nothing (or just "i" or "x") is left.
+
+   super_languages("fr-CA-joual")  is  ("fr-CA", "fr")
+
+   super_languages("en-AU")  is  ("en")
+
+   super_languages("en")  is  empty-list, ()
+
+   super_languages("i-cherokee")  is  empty-list, ()
+    ...not ("i"), which would be illegal as well as pointless.
+
+If $lang1 is not a valid language tag, returns empty-list in
+a list context, undef in a scalar context.
+
+A notable and rather unavoidable problem with this method:
+"x-mingo-tom" has an "x" because the whole tag isn't an
+IANA-registered tag -- but super_languages('x-mingo-tom') is
+('x-mingo') -- which isn't really right, since 'i-mingo' is
+registered.  But this module has no way of knowing that.  (But note
+that same_language_tag('x-mingo', 'i-mingo') is TRUE.)
+
+More importantly, you assume I<at your peril> that superordinates of
+$lang1 are mutually intelligible with $lang1.  Consider this
+carefully.
+=end item
+
+=begin item
+locale2language_tag($locale_identifier)
+
+This takes a locale name (like "en", "en_US", or "en_US.ISO8859-1")
+and maps it to a language tag.  If it's not mappable (as with,
+notably, "C" and "POSIX"), this returns empty-list in a list context,
+or undef in a scalar context.
+
+   locale2language_tag("en") is "en"
+
+   locale2language_tag("en_US") is "en-US"
+
+   locale2language_tag("en_US.ISO8859-1") is "en-US"
+
+   locale2language_tag("C") is undef or ()
+
+   locale2language_tag("POSIX") is undef or ()
+
+   locale2language_tag("POSIX") is undef or ()
+
+I'm not totally sure that locale names map satisfactorily to language
+tags.  Think REAL hard about how you use this.  YOU HAVE BEEN WARNED.
+
+The output is untainted.  If you don't know what tainting is,
+don't worry about it.
+=end item
+
+=begin item
+function encode_language_tag($lang1)
+
+This function, if given a language tag, returns an encoding of it such
+that:
+
+* tags representing different languages never get the same encoding.
+
+* tags representing the same language always get the same encoding.
+
+* an encoding of a formally valid language tag always is a string
+value that is defined, has length, and is true if considered as a
+boolean.
+
+Note that the encoding itself is B<not> a formally valid language tag.
+Note also that you cannot, currently, go from an encoding back to a
+language tag that it's an encoding of.
+
+Note also that you B<must> consider the encoded value as atomic; i.e.,
+you should not consider it as anything but an opaque, unanalysable
+string value.  (The internals of the encoding method may change in
+future versions, as the language tagging standard changes over time.)
+
+C<encode_language_tag> returns undef if given anything other than a
+formally valid language tag.
+
+The reason C<encode_language_tag> exists is because different language
+tags may represent the same language; this is normally treatable with
+C<same_language_tag>, but consider this situation:
+
+You have a data file that expresses greetings in different languages.
+Its format is "[language tag]=[how to say 'Hello']", like:
+
+          en-US=Hiho
+          fr=Bonjour
+          i-mingo=Hau'
+
+And suppose you write a program that reads that file and then runs as
+a daemon, answering client requests that specify a language tag and
+then expect the string that says how to greet in that language.  So an
+interaction looks like:
+
+          greeting-client asks:    fr
+          greeting-server answers: Bonjour
+
+So far so good.  But suppose the way you're implementing this is:
+
+          my %greetings;
+          die unless open(IN, "<", "in.dat");
+          while(<IN>) {
+            chomp;
+            next unless /^([^=]+)=(.+)/s;
+            my($lang, $expr) = ($1, $2);
+            $greetings{$lang} = $expr;
+          }
+          close(IN);
+
+at which point %greetings has the contents:
+
+          "en-US"   => "Hiho"
+          "fr"      => "Bonjour"
+          "i-mingo" => "Hau'"
+
+And suppose then that you answer client requests for language $wanted
+by just looking up $greetings{$wanted}.
+
+If the client asks for "fr", that will look up successfully in
+%greetings, to the value "Bonjour".  And if the client asks for
+"i-mingo", that will look up successfully in %greetings, to the value
+"Hau'".
+
+But if the client asks for "i-Mingo" or "x-mingo", or "Fr", then the
+lookup in %greetings fails.  That's the Wrong Thing.
+
+You could instead do lookups on $wanted with:
+
+          use I18N::LangTags qw(same_language_tag);
+          my $response = '';
+          foreach my $l2 (keys %greetings) {
+            if(same_language_tag($wanted, $l2)) {
+              $response = $greetings{$l2};
+              last;
+            }
+          }
+
+But that's rather inefficient.  A better way to do it is to start your
+program with:
+
+          use I18N::LangTags qw(encode_language_tag);
+          my %greetings;
+          die unless open(IN, "<", "in.dat");
+          while(<IN>) {
+            chomp;
+            next unless /^([^=]+)=(.+)/s;
+            my($lang, $expr) = ($1, $2);
+            $greetings{
+                        encode_language_tag($lang)
+                      } = $expr;
+          }
+          close(IN);
+
+and then just answer client requests for language $wanted by just
+looking up
+
+          $greetings{encode_language_tag($wanted)}
+
+And that does the Right Thing.
+=end item
+
+=begin item
+function alternate_language_tags($lang1)
+
+This function, if given a language tag, returns all language tags that
+are alternate forms of this language tag.  (I.e., tags which refer to
+the same language.)  This is meant to handle legacy tags caused by
+the minor changes in language tag standards over the years; and
+the x-/i- alternation is also dealt with.
+
+Note that this function does I<not> try to equate new (and never-used,
+and unusable)
+ISO639-2 three-letter tags to old (and still in use) ISO639-1
+two-letter equivalents -- like "ara" -> "ar" -- because
+"ara" has I<never> been in use as an Internet language tag,
+and RFC 3066 stipulates that it never should be, since a shorter
+tag ("ar") exists.
+
+Examples:
+
+  alternate_language_tags('no-bok')       is ('nb')
+  alternate_language_tags('nb')           is ('no-bok')
+  alternate_language_tags('he')           is ('iw')
+  alternate_language_tags('iw')           is ('he')
+  alternate_language_tags('i-hakka')      is ('zh-hakka', 'x-hakka')
+  alternate_language_tags('zh-hakka')     is ('i-hakka', 'x-hakka')
+  alternate_language_tags('en')           is ()
+  alternate_language_tags('x-mingo-tom')  is ('i-mingo-tom')
+  alternate_language_tags('x-klikitat')   is ('i-klikitat')
+  alternate_language_tags('i-klikitat')   is ('x-klikitat')
+
+This function returns empty-list if given anything other than a formally
+valid language tag.
+=end item
+
+=begin item
+function @langs = panic_languages(@accept_languages)
+
+This function takes a list of 0 or more language
+tags that constitute a given user's Accept-Language list, and
+returns a list of tags for I<other> (non-super)
+languages that are probably acceptable to the user, to be
+used I<if all else fails>.
+
+For example, if a user accepts only 'ca' (Catalan) and
+'es' (Spanish), and the documents/interfaces you have
+available are just in German, Italian, and Chinese, then
+the user will most likely want the Italian one (and not
+the Chinese or German one!), instead of getting
+nothing.  So C<panic_languages('ca', 'es')> returns
+a list containing 'it' (Italian).
+
+English ('en') is I<always> in the return list, but
+whether it's at the very end or not depends
+on the input languages.  This function works by consulting
+an internal table that stipulates what common
+languages are "close" to each other.
+
+A useful construct you might consider using is:
+
+  @fallbacks = super_languages(@accept_languages);
+  push @fallbacks, panic_languages(
+    @accept_languages, @fallbacks,
+  );
+=end item
+
+=begin item
+implicate_supers( ...languages... )
+
+This takes a list of strings (which are presumed to be language-tags;
+strings that aren't, are ignored); and after each one, this function
+inserts super-ordinate forms that don't already appear in the list.
+The original list, plus these insertions, is returned.
+
+In other words, it takes this:
+
+  pt-br de-DE en-US fr pt-br-janeiro
+
+and returns this:
+
+  pt-br pt de-DE de en-US en fr pt-br-janeiro
+
+This function is most useful in the idiom
+
+  implicate_supers( I18N::LangTags::Detect::detect() );
+
+(See L<I18N::LangTags::Detect>.)
+=end item
+
+=begin item
+implicate_supers_strictly( ...languages... )
+
+This works like C<implicate_supers> except that the implicated
+forms are added to the end of the return list.
+
+In other words, implicate_supers_strictly takes a list of strings
+(which are presumed to be language-tags; strings that aren't, are
+ignored) and after the whole given list, it inserts the super-ordinate forms
+of all given tags, minus any tags that already appear in the input list.
+
+In other words, it takes this:
+
+  pt-br de-DE en-US fr pt-br-janeiro
+
+and returns this:
+
+  pt-br de-DE en-US fr pt-br-janeiro pt de en
+
+The reason this function has "_strictly" in its name is that when
+you're processing an Accept-Language list according to the RFCs, if
+you interpret the RFCs quite strictly, then you would use
+implicate_supers_strictly, but for normal use (i.e., common-sense use,
+as far as I'm concerned) you'd use implicate_supers.
 =end item
 
 =head1 SEE ALSO
