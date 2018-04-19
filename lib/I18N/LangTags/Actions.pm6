@@ -20,7 +20,7 @@ class I18N::LangTags::Actions {
             is_disrec => False,
         );
     }
-    method langtag($/) { make $/.Str }
+    method langtag($/) { make $/.Str.lc }
     method name($/) { make $/.Str }
 
     method scan_languages($/) {
