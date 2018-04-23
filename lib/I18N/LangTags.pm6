@@ -263,67 +263,63 @@ of how to correctly use language tags.
 =head1 FUNCTIONS
 
 =begin item
-is_language_tag($lang1)
+C<is_language_tag(Str:D $lang1 --> Bool)>
 
-Returns true iff $lang1 is a formally valid language tag.
+Returns C<True> if C<$lang1> is a formally valid language tag.
 
-   is_language_tag("fr")            is TRUE
-   is_language_tag("x-jicarilla")   is FALSE
-       (Subtags can be 8 chars long at most -- 'jicarilla' is 9)
+   is_language_tag("fr")              # is True
+   is_language_tag("x-jicarilla")     # is False
+   # Subtags can be 8 chars long at most -- 'jicarilla' is 9
 
-   is_language_tag("sgn-US")    is TRUE
-       (That's American Sign Language)
+   is_language_tag("sgn-US")          # is True
+   # That's American Sign Language
 
-   is_language_tag("i-Klikitat")    is TRUE
-       (True without regard to the fact noone has actually
-        registered Klikitat -- it's a formally valid tag)
+   is_language_tag("i-Klikitat")      # is True
+   # True without regard to the fact noone has actually
+   # registered Klikitat -- it's a formally valid tag
 
-   is_language_tag("fr-patois")     is TRUE
-       (Formally valid -- altho descriptively weak!)
+   is_language_tag("fr-patois")       # is True
+   # Formally valid -- altho descriptively weak!
 
-   is_language_tag("Spanish")       is FALSE
-   is_language_tag("french-patois") is FALSE
-       (No good -- first subtag has to match
-        /^([xXiI]|[a-zA-Z]{2,3})$/ -- see RFC3066)
+   is_language_tag("Spanish")         # is False
+   is_language_tag("french-patois")   # is False
+   # No good -- first subtag has to be 2 or 3 chars long -- see RFC3066
 
-   is_language_tag("x-borg-prot2532") is TRUE
-       (Yes, subtags can contain digits, as of RFC3066)
+   is_language_tag("x-borg-prot2532") # is True
+   # Yes, subtags can contain digits, as of RFC3066
 =end item
 
 =begin item
-function extract_language_tags($whatever)
+C<extract_language_tags(Str:D $text --> Seq)>
 
 Returns a list of whatever looks like formally valid language tags
-in $whatever.  Not very smart, so don't get too creative with
+in C<$text>.  Not very smart, so don't get too creative with
 what you want to feed it.
 
   extract_language_tags("fr, fr-ca, i-mingo")
-    returns:   ('fr', 'fr-ca', 'i-mingo')
+  # returns:   ('fr', 'fr-ca', 'i-mingo')
 
   extract_language_tags("It's like this: I'm in fr -- French!")
-    returns:   ('It', 'in', 'fr')
-  (So don't just feed it any old thing.)
-
-The output is untainted.  If you don't know what tainting is,
-don't worry about it.
+  # returns:   ('It', 'in', 'fr')
+  # (So don't just feed it any old thing.)
 =end item
 
 =begin item
-function same_language_tag($lang1, $lang2)
+C<same_language_tag(Str:D $lang1, Str:D $lang2 --> Bool)>
 
-Returns true iff $lang1 and $lang2 are acceptable variant tags
+Returns C<True> if C<$lang1> and C<$lang2> are acceptable variant tags
 representing the same language-form.
 
-   same_language_tag('x-kadara', 'i-kadara')  is TRUE
-      (The x/i- alternation doesn't matter)
-   same_language_tag('X-KADARA', 'i-kadara')  is TRUE
-      (...and neither does case)
-   same_language_tag('en',       'en-US')     is FALSE
-      (all-English is not the SAME as US English)
-   same_language_tag('x-kadara', 'x-kadar')   is FALSE
-      (these are totally unrelated tags)
-   same_language_tag('no-bok',    'nb')       is TRUE
-      (no-bok is a legacy tag for nb (Norwegian Bokmal))
+   same_language_tag('x-kadara', 'i-kadara')  # is True
+   #   (The x/i- alternation doesn't matter)
+   same_language_tag('X-KADARA', 'i-kadara')  # is True
+   #   (...and neither does case)
+   same_language_tag('en',       'en-US')     # is False
+   #   (all-English is not the SAME as US English)
+   same_language_tag('x-kadara', 'x-kadar')   # is False
+   #   (these are totally unrelated tags)
+   same_language_tag('no-bok',    'nb')       # is True
+   #   (no-bok is a legacy tag for nb (Norwegian Bokmal))
 
 C<same_language_tag> works by just seeing whether
 C<encode_language_tag($lang1)> is the same as
@@ -334,96 +330,95 @@ reasons.)
 =end item
 
 =begin item
-function similarity_language_tag($lang1, $lang2)
+C<similarity_language_tag($lang1, $lang2 --> Int)>
 
 Returns an integer representing the degree of similarity between
-tags $lang1 and $lang2 (the order of which does not matter), where
+tags C<$lang1> and C<$lang2> (the order of which does not matter), where
 similarity is the number of common elements on the left,
 without regard to case and to x/i- alternation.
 
-   similarity_language_tag('fr', 'fr-ca')           is 1
-      (one element in common)
-   similarity_language_tag('fr-ca', 'fr-FR')        is 1
-      (one element in common)
+   similarity_language_tag('fr', 'fr-ca')           # is 1
+   #   (one element in common)
+   similarity_language_tag('fr-ca', 'fr-FR')        # is 1
+   #   (one element in common)
 
    similarity_language_tag('fr-CA-joual',
-                           'fr-CA-PEI')             is 2
-   similarity_language_tag('fr-CA-joual', 'fr-CA')  is 2
-      (two elements in common)
+                           'fr-CA-PEI')             # is 2
+   similarity_language_tag('fr-CA-joual', 'fr-CA')  # is 2
+   #   (two elements in common)
 
-   similarity_language_tag('x-kadara', 'i-kadara')  is 1
-      (x/i- doesn't matter)
+   similarity_language_tag('x-kadara', 'i-kadara')  # is 1
+   #   (x/i- doesn't matter)
 
-   similarity_language_tag('en',       'x-kadar')   is 0
-   similarity_language_tag('x-kadara', 'x-kadar')   is 0
-      (unrelated tags -- no similarity)
+   similarity_language_tag('en',       'x-kadar')   # is 0
+   similarity_language_tag('x-kadara', 'x-kadar')   # is 0
+   #   (unrelated tags -- no similarity)
 
    similarity_language_tag('i-cree-syllabic',
-                           'i-cherokee-syllabic')   is 0
-      (no B<leftmost> elements in common!)
+                           'i-cherokee-syllabic')   # is 0
+   #   (no B<leftmost> elements in common!)
 =end item
 
 =begin item
-function is_dialect_of($lang1, $lang2)
+C<is_dialect_of(Str:D $lang1, Str:D $lang2 -->Bool)>
 
-Returns true iff language tag $lang1 represents a subform of
-language tag $lang2.
+Returns C<True> if language tag C<$lang1> represents a subform of
+language tag C<$lang2>.
 
 B<Get the order right!  It doesn't work the other way around!>
 
-   is_dialect_of('en-US', 'en')            is TRUE
-     (American English IS a dialect of all-English)
+   is_dialect_of('en-US', 'en')            # is True
+   # (American English IS a dialect of all-English)
 
-   is_dialect_of('fr-CA-joual', 'fr-CA')   is TRUE
-   is_dialect_of('fr-CA-joual', 'fr')      is TRUE
-     (Joual is a dialect of (a dialect of) French)
+   is_dialect_of('fr-CA-joual', 'fr-CA')   # is True
+   is_dialect_of('fr-CA-joual', 'fr')      # is True
+   # (Joual is a dialect of (a dialect of) French)
 
-   is_dialect_of('en', 'en-US')            is FALSE
-     (all-English is a NOT dialect of American English)
+   is_dialect_of('en', 'en-US')            # is False
+   # (all-English is a NOT dialect of American English)
 
-   is_dialect_of('fr', 'en-CA')            is FALSE
+   is_dialect_of('fr', 'en-CA')            # is False
 
-   is_dialect_of('en',    'en'   )         is TRUE
-   is_dialect_of('en-US', 'en-US')         is TRUE
-     (B<Note:> these are degenerate cases)
+   is_dialect_of('en',    'en'   )         # is True
+   is_dialect_of('en-US', 'en-US')         # is True
+   # (these are degenerate cases)
 
-   is_dialect_of('i-mingo-tom', 'x-Mingo') is TRUE
-     (the x/i thing doesn't matter, nor does case)
+   is_dialect_of('i-mingo-tom', 'x-Mingo') # is True
+   #  (the x/i thing doesn't matter, nor does case)
 
-   is_dialect_of('nn', 'no')               is TRUE
-     (because 'nn' (New Norse) is aliased to 'no-nyn',
-      as a special legacy case, and 'no-nyn' is a
-      subform of 'no' (Norwegian))
+   is_dialect_of('nn', 'no')               # is True
+   # (because 'nn' (New Norse) is aliased to 'no-nyn',
+   #  as a special legacy case, and 'no-nyn' is a
+   #  subform of 'no' (Norwegian))
 =end item
 
 =begin item
-super_languages($lang1)
+C<super_languages(Str:D $lang1 --> Seq)>
 
-Returns a list of language tags that are superordinate tags to $lang1
--- it gets this by removing subtags from the end of $lang1 until
+Returns a sequence of language tags that are superordinate tags to C<$lang1>
+-- it gets this by removing subtags from the end of C<$lang1> until
 nothing (or just "i" or "x") is left.
 
-   super_languages("fr-CA-joual")  is  ("fr-CA", "fr")
+   super_languages("fr-CA-joual")  # is  ("fr-CA", "fr")
 
-   super_languages("en-AU")  is  ("en")
+   super_languages("en-AU")  # is  ("en")
 
-   super_languages("en")  is  empty-list, ()
+   super_languages("en")  # is  empty-list, ()
 
-   super_languages("i-cherokee")  is  empty-list, ()
-    ...not ("i"), which would be illegal as well as pointless.
+   super_languages("i-cherokee")  # is  empty-list, ()
+   # ...not ("i"), which would be illegal as well as pointless.
 
-If $lang1 is not a valid language tag, returns empty-list in
-a list context, undef in a scalar context.
+If C<$lang1> is not a valid language tag, returns empty-list.
 
 A notable and rather unavoidable problem with this method:
 "x-mingo-tom" has an "x" because the whole tag isn't an
 IANA-registered tag -- but super_languages('x-mingo-tom') is
 ('x-mingo') -- which isn't really right, since 'i-mingo' is
 registered.  But this module has no way of knowing that.  (But note
-that same_language_tag('x-mingo', 'i-mingo') is TRUE.)
+that same_language_tag('x-mingo', 'i-mingo') is C<True>.)
 
 More importantly, you assume I<at your peril> that superordinates of
-$lang1 are mutually intelligible with $lang1.  Consider this
+C<$lang1> are mutually intelligible with C<$lang1>.  Consider this
 carefully.
 =end item
 
