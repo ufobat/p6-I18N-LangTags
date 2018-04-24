@@ -22,7 +22,7 @@ Please see the "See Also" references for a thorough explanation of how to correc
 FUNCTIONS
 =========
 
-  * `is_language_tag(Str:D $lang1 --` Bool)>
+  * `is_language_tag(Str:D $lang1 --> Bool)`
 
     Returns `True` if `$lang1` is a formally valid language tag.
 
@@ -47,7 +47,7 @@ FUNCTIONS
         is_language_tag("x-borg-prot2532") # is True
         # Yes, subtags can contain digits, as of RFC3066
 
-  * `extract_language_tags(Str:D $text --` Seq)>
+  * `extract_language_tags(Str:D $text --> Seq)`
 
     Returns a list of whatever looks like formally valid language tags in `$text`. Not very smart, so don't get too creative with what you want to feed it.
 
@@ -58,7 +58,7 @@ FUNCTIONS
         # returns:   ('It', 'in', 'fr')
         # (So don't just feed it any old thing.)
 
-  * `same_language_tag(Str:D $lang1, Str:D $lang2 --` Bool)>
+  * `same_language_tag(Str:D $lang1, Str:D $lang2 --> Bool)`
 
     Returns `True` if `$lang1` and `$lang2` are acceptable variant tags representing the same language-form.
 
@@ -77,7 +77,7 @@ FUNCTIONS
 
     (Yes, I know this function is named a bit oddly. Call it historic reasons.)
 
-  * `similarity_language_tag($lang1, $lang2 --` Int)>
+  * `similarity_language_tag($lang1, $lang2 --> Int)`
 
     Returns an integer representing the degree of similarity between tags `$lang1` and `$lang2` (the order of which does not matter), where similarity is the number of common elements on the left, without regard to case and to x/i- alternation.
 
@@ -102,7 +102,7 @@ FUNCTIONS
                                 'i-cherokee-syllabic')   # is 0
         #   (no B<leftmost> elements in common!)
 
-  * `is_dialect_of(Str:D $lang1, Str:D $lang2 --`Bool)>
+  * `is_dialect_of(Str:D $lang1, Str:D $lang2 -->Bool)`
 
     Returns `True` if language tag `$lang1` represents a subform of language tag `$lang2`.
 
@@ -132,7 +132,7 @@ FUNCTIONS
         #  as a special legacy case, and 'no-nyn' is a
         #  subform of 'no' (Norwegian))
 
-  * `super_languages(Str:D $lang1 --` Seq)>
+  * `super_languages(Str:D $lang1 --> Seq)`
 
     Returns a sequence of language tags that are superordinate tags to `$lang1` -- it gets this by removing subtags from the end of `$lang1` until nothing (or just "i" or "x") is left.
 
@@ -151,7 +151,7 @@ FUNCTIONS
 
     More importantly, you assume *at your peril* that superordinates of `$lang1` are mutually intelligible with `$lang1`. Consider this carefully.
 
-  * locale2language_tag($locale_identifier)
+  * `locale2language_tag(Str:D $locale_identifier --> Str)`
 
     This takes a locale name (like "en", "en_US", or "en_US.ISO8859-1") and maps it to a language tag. If it's not mappable (as with, notably, "C" and "POSIX"), this returns empty-list in a list context, or undef in a scalar context.
 
@@ -171,7 +171,7 @@ FUNCTIONS
 
     The output is untainted. If you don't know what tainting is, don't worry about it.
 
-  * function encode_language_tag($lang1)
+  * `encode_language_tag(Str:D $lang1 -> Str)`
 
     This function, if given a language tag, returns an encoding of it such that:
 
@@ -185,7 +185,7 @@ FUNCTIONS
 
     Note also that you **must** consider the encoded value as atomic; i.e., you should not consider it as anything but an opaque, unanalysable string value. (The internals of the encoding method may change in future versions, as the language tagging standard changes over time.)
 
-    `encode_language_tag` returns undef if given anything other than a formally valid language tag.
+    `encode_language_tag` returns `Str` if given anything other than a formally valid language tag.
 
     The reason `encode_language_tag` exists is because different language tags may represent the same language; this is normally treatable with `same_language_tag`, but consider this situation:
 
@@ -200,7 +200,7 @@ FUNCTIONS
         greeting-client asks:    fr
         greeting-server answers: Bonjour
 
-    So far so good. But suppose the way you're implementing this is:
+    So far so good. But suppose the way you're implementing this is: **This is Perl 5 Code**
 
         my %greetings;
         die unless open(IN, "<", "in.dat");
@@ -224,7 +224,7 @@ FUNCTIONS
 
     But if the client asks for "i-Mingo" or "x-mingo", or "Fr", then the lookup in %greetings fails. That's the Wrong Thing.
 
-    You could instead do lookups on $wanted with:
+    You could instead do lookups on $wanted with: **This is Perl 5 Code**
 
         use I18N::LangTags qw(same_language_tag);
         my $response = '';
@@ -235,7 +235,7 @@ FUNCTIONS
           }
         }
 
-    But that's rather inefficient. A better way to do it is to start your program with:
+    But that's rather inefficient. A better way to do it is to start your program with: **This is Perl 5 Code**
 
         use I18N::LangTags qw(encode_language_tag);
         my %greetings;
@@ -250,13 +250,13 @@ FUNCTIONS
         }
         close(IN);
 
-    and then just answer client requests for language $wanted by just looking up
+    and then just answer client requests for language $wanted by just looking up **This is Perl 5 Code**
 
         $greetings{encode_language_tag($wanted)}
 
     And that does the Right Thing.
 
-  * function alternate_language_tags($lang1)
+  * `alternate_language_tags(Str:D $lang1 --> List)`
 
     This function, if given a language tag, returns all language tags that are alternate forms of this language tag. (I.e., tags which refer to the same language.) This is meant to handle legacy tags caused by the minor changes in language tag standards over the years; and the x-/i- alternation is also dealt with.
 
@@ -264,20 +264,20 @@ FUNCTIONS
 
     Examples:
 
-        alternate_language_tags('no-bok')       is ('nb')
-        alternate_language_tags('nb')           is ('no-bok')
-        alternate_language_tags('he')           is ('iw')
-        alternate_language_tags('iw')           is ('he')
-        alternate_language_tags('i-hakka')      is ('zh-hakka', 'x-hakka')
-        alternate_language_tags('zh-hakka')     is ('i-hakka', 'x-hakka')
-        alternate_language_tags('en')           is ()
-        alternate_language_tags('x-mingo-tom')  is ('i-mingo-tom')
-        alternate_language_tags('x-klikitat')   is ('i-klikitat')
-        alternate_language_tags('i-klikitat')   is ('x-klikitat')
+        alternate_language_tags('no-bok')       # is ('nb')
+        alternate_language_tags('nb')           # is ('no-bok')
+        alternate_language_tags('he')           # is ('iw')
+        alternate_language_tags('iw')           # is ('he')
+        alternate_language_tags('i-hakka')      # is ('zh-hakka', 'x-hakka')
+        alternate_language_tags('zh-hakka')     # is ('i-hakka', 'x-hakka')
+        alternate_language_tags('en')           # is ()
+        alternate_language_tags('x-mingo-tom')  # is ('i-mingo-tom')
+        alternate_language_tags('x-klikitat')   # is ('i-klikitat')
+        alternate_language_tags('i-klikitat')   # is ('x-klikitat')
 
     This function returns empty-list if given anything other than a formally valid language tag.
 
-  * function @langs = panic_languages(@accept_languages)
+  * `panic_languages(@accept_languages -> Seq)`
 
     This function takes a list of 0 or more language tags that constitute a given user's Accept-Language list, and returns a list of tags for *other* (non-super) languages that are probably acceptable to the user, to be used *if all else fails*.
 
@@ -288,11 +288,11 @@ FUNCTIONS
     A useful construct you might consider using is:
 
         @fallbacks = super_languages(@accept_languages);
-        push @fallbacks, panic_languages(
-          @accept_languages, @fallbacks,
+        @fallbacks.append:  panic_languages(
+          |@accept_languages, |@fallbacks,
         );
 
-  * implicate_supers( ...languages... )
+  * `implicate_supers(@languages --> Seq)`
 
     This takes a list of strings (which are presumed to be language-tags; strings that aren't, are ignored); and after each one, this function inserts super-ordinate forms that don't already appear in the list. The original list, plus these insertions, is returned.
 
@@ -304,13 +304,11 @@ FUNCTIONS
 
         pt-br pt de-DE de en-US en fr pt-br-janeiro
 
-    This function is most useful in the idiom
+    This function is most useful in the idiom. **But detect() is not jet implemented**.
 
         implicate_supers( I18N::LangTags::Detect::detect() );
 
-    (See [I18N::LangTags::Detect](I18N::LangTags::Detect).)
-
-  * implicate_supers_strictly( ...languages... )
+  * `implicate_supers_strictly(@languages --> Seq)`
 
     This works like `implicate_supers` except that the implicated forms are added to the end of the return list.
 

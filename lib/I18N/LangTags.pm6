@@ -1,5 +1,5 @@
 use v6.c;
-unit class I18N::LangTags:ver<0.0.1>;
+unit class I18N::LangTags:ver<0.1.0>;
 use I18N::LangTags::Grammar;
 use I18N::LangTags::Actions;
 
@@ -81,7 +81,7 @@ sub locale2language_tag(Str:D $locale is copy --> Str) is export {
     return Str;
 }
 
-sub encode_language_tag(Str:D $tag is copy --> Str:D) is export {
+sub encode_language_tag(Str:D $tag is copy --> Str) is export {
     # Only similarity_language_tag() is allowed to analyse encodings!
     ## Changes in the language tagging standards may have to be reflected here.
     return Str unless is_language_tag($tag);
@@ -116,7 +116,7 @@ sub encode_language_tag(Str:D $tag is copy --> Str:D) is export {
     return "~" ~ uc($tag);
 }
 
-sub alternate_language_tags(Str:D $tag) is export {
+sub alternate_language_tags(Str:D $tag --> List) is export {
     return () unless is_language_tag($tag);
     my @em;
 
@@ -263,7 +263,7 @@ of how to correctly use language tags.
 =head1 FUNCTIONS
 
 =begin item
-C<is_language_tag(Str:D $lang1 --> Bool)>
+C<<is_language_tag(Str:D $lang1 --> Bool)>>
 
 Returns C<True> if C<$lang1> is a formally valid language tag.
 
@@ -290,7 +290,7 @@ Returns C<True> if C<$lang1> is a formally valid language tag.
 =end item
 
 =begin item
-C<extract_language_tags(Str:D $text --> Seq)>
+C<<extract_language_tags(Str:D $text --> Seq)>>
 
 Returns a list of whatever looks like formally valid language tags
 in C<$text>.  Not very smart, so don't get too creative with
@@ -305,7 +305,7 @@ what you want to feed it.
 =end item
 
 =begin item
-C<same_language_tag(Str:D $lang1, Str:D $lang2 --> Bool)>
+C<<same_language_tag(Str:D $lang1, Str:D $lang2 --> Bool)>>
 
 Returns C<True> if C<$lang1> and C<$lang2> are acceptable variant tags
 representing the same language-form.
@@ -330,7 +330,7 @@ reasons.)
 =end item
 
 =begin item
-C<similarity_language_tag($lang1, $lang2 --> Int)>
+C<<similarity_language_tag($lang1, $lang2 --> Int)>>
 
 Returns an integer representing the degree of similarity between
 tags C<$lang1> and C<$lang2> (the order of which does not matter), where
@@ -360,7 +360,7 @@ without regard to case and to x/i- alternation.
 =end item
 
 =begin item
-C<is_dialect_of(Str:D $lang1, Str:D $lang2 -->Bool)>
+C<<is_dialect_of(Str:D $lang1, Str:D $lang2 -->Bool)>>
 
 Returns C<True> if language tag C<$lang1> represents a subform of
 language tag C<$lang2>.
@@ -393,7 +393,7 @@ B<Get the order right!  It doesn't work the other way around!>
 =end item
 
 =begin item
-C<super_languages(Str:D $lang1 --> Seq)>
+C<<super_languages(Str:D $lang1 --> Seq)>>
 
 Returns a sequence of language tags that are superordinate tags to C<$lang1>
 -- it gets this by removing subtags from the end of C<$lang1> until
@@ -423,7 +423,7 @@ carefully.
 =end item
 
 =begin item
-locale2language_tag($locale_identifier)
+C<<locale2language_tag(Str:D $locale_identifier --> Str)>>
 
 This takes a locale name (like "en", "en_US", or "en_US.ISO8859-1")
 and maps it to a language tag.  If it's not mappable (as with,
@@ -450,7 +450,7 @@ don't worry about it.
 =end item
 
 =begin item
-function encode_language_tag($lang1)
+C<<encode_language_tag(Str:D $lang1 -> Str)>>
 
 This function, if given a language tag, returns an encoding of it such
 that:
@@ -472,7 +472,7 @@ you should not consider it as anything but an opaque, unanalysable
 string value.  (The internals of the encoding method may change in
 future versions, as the language tagging standard changes over time.)
 
-C<encode_language_tag> returns undef if given anything other than a
+C<encode_language_tag> returns C<Str> if given anything other than a
 formally valid language tag.
 
 The reason C<encode_language_tag> exists is because different language
@@ -495,6 +495,7 @@ interaction looks like:
           greeting-server answers: Bonjour
 
 So far so good.  But suppose the way you're implementing this is:
+B<This is Perl 5 Code>
 
           my %greetings;
           die unless open(IN, "<", "in.dat");
@@ -524,6 +525,7 @@ But if the client asks for "i-Mingo" or "x-mingo", or "Fr", then the
 lookup in %greetings fails.  That's the Wrong Thing.
 
 You could instead do lookups on $wanted with:
+B<This is Perl 5 Code>
 
           use I18N::LangTags qw(same_language_tag);
           my $response = '';
@@ -536,6 +538,7 @@ You could instead do lookups on $wanted with:
 
 But that's rather inefficient.  A better way to do it is to start your
 program with:
+B<This is Perl 5 Code>
 
           use I18N::LangTags qw(encode_language_tag);
           my %greetings;
@@ -552,6 +555,7 @@ program with:
 
 and then just answer client requests for language $wanted by just
 looking up
+B<This is Perl 5 Code>
 
           $greetings{encode_language_tag($wanted)}
 
@@ -559,7 +563,7 @@ And that does the Right Thing.
 =end item
 
 =begin item
-function alternate_language_tags($lang1)
+C<<alternate_language_tags(Str:D $lang1 --> List)>>
 
 This function, if given a language tag, returns all language tags that
 are alternate forms of this language tag.  (I.e., tags which refer to
@@ -577,23 +581,23 @@ tag ("ar") exists.
 
 Examples:
 
-  alternate_language_tags('no-bok')       is ('nb')
-  alternate_language_tags('nb')           is ('no-bok')
-  alternate_language_tags('he')           is ('iw')
-  alternate_language_tags('iw')           is ('he')
-  alternate_language_tags('i-hakka')      is ('zh-hakka', 'x-hakka')
-  alternate_language_tags('zh-hakka')     is ('i-hakka', 'x-hakka')
-  alternate_language_tags('en')           is ()
-  alternate_language_tags('x-mingo-tom')  is ('i-mingo-tom')
-  alternate_language_tags('x-klikitat')   is ('i-klikitat')
-  alternate_language_tags('i-klikitat')   is ('x-klikitat')
+  alternate_language_tags('no-bok')       # is ('nb')
+  alternate_language_tags('nb')           # is ('no-bok')
+  alternate_language_tags('he')           # is ('iw')
+  alternate_language_tags('iw')           # is ('he')
+  alternate_language_tags('i-hakka')      # is ('zh-hakka', 'x-hakka')
+  alternate_language_tags('zh-hakka')     # is ('i-hakka', 'x-hakka')
+  alternate_language_tags('en')           # is ()
+  alternate_language_tags('x-mingo-tom')  # is ('i-mingo-tom')
+  alternate_language_tags('x-klikitat')   # is ('i-klikitat')
+  alternate_language_tags('i-klikitat')   # is ('x-klikitat')
 
 This function returns empty-list if given anything other than a formally
 valid language tag.
 =end item
 
 =begin item
-function @langs = panic_languages(@accept_languages)
+C<<panic_languages(@accept_languages -> Seq)>>
 
 This function takes a list of 0 or more language
 tags that constitute a given user's Accept-Language list, and
@@ -618,13 +622,13 @@ languages are "close" to each other.
 A useful construct you might consider using is:
 
   @fallbacks = super_languages(@accept_languages);
-  push @fallbacks, panic_languages(
-    @accept_languages, @fallbacks,
+  @fallbacks.append:  panic_languages(
+    |@accept_languages, |@fallbacks,
   );
 =end item
 
 =begin item
-implicate_supers( ...languages... )
+C<<implicate_supers(@languages --> Seq)>>
 
 This takes a list of strings (which are presumed to be language-tags;
 strings that aren't, are ignored); and after each one, this function
@@ -639,15 +643,14 @@ and returns this:
 
   pt-br pt de-DE de en-US en fr pt-br-janeiro
 
-This function is most useful in the idiom
+This function is most useful in the idiom. B<But detect() is not jet implemented>.
 
   implicate_supers( I18N::LangTags::Detect::detect() );
 
-(See L<I18N::LangTags::Detect>.)
 =end item
 
 =begin item
-implicate_supers_strictly( ...languages... )
+C<<implicate_supers_strictly(@languages --> Seq)>>
 
 This works like C<implicate_supers> except that the implicated
 forms are added to the end of the return list.
